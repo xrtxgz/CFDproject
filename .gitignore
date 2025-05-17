@@ -1,0 +1,47 @@
+# ==================================
+# Python cache and compiled files
+# ==================================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+*.log
+
+# ==================================
+# Jupyter Notebook checkpoints
+# ==================================
+.ipynb_checkpoints/
+
+# ==================================
+# Virtual environments
+# ==================================
+.venv/
+venv/
+ENV/
+env/
+*.env
+
+# ==================================
+# IDE settings (PyCharm / VSCode)
+# ==================================
+.idea/
+*.iml
+.vscode/
+
+# ==================================
+# System files
+# ==================================
+.DS_Store
+Thumbs.db
+
+# ==================================
+# Streamlit hidden settings
+# ==================================
+.streamlit/
+
+# ==================================
+# Dataset CSVs (optional)
+# Uncomment if you don’t want to track data files
+# ==================================
+# DataSet/*.csv
