@@ -113,25 +113,38 @@ class CFDDiscovererWithFD:
 
     def visualize_fd_candidates(self, rhs: Optional[str] = None):
         """
-        可视化 discover_fds() 后得到的所有候选 FD（未最小化）结构树。
-        默认显示所有 RHS；也可指定 rhs。
+        Construct the FD rule prefix tree and visualize the specified RHS.
+        Automatically save the constructed rule tree as self.repo.
         """
         if not self.fd_candidates:
-            print("⚠️ 请先调用 discover_fds() 生成 fd_candidates。")
-            return
-    
-        repo = RuleRepository()
-        for lhs, r, conf in self.fd_candidates:
-            repo.add_rule(lhs, r, conf)
-    
-        if rhs:
-            repo.visualize_rhs_tree(rhs)
-        else:
-            for r in repo.rules:
-                print(f"Visualizing FD candidates for RHS: {r}")
-                repo.visualize_rhs_tree(r)
+            self.discover_fds()
 
-        
+        self.repo = RuleRepository()
+        for lhs, r, conf in self.fd_candidates:
+            self.repo.add_rule(lhs, r, conf)
+
+        if rhs:
+            return self.repo.visualize_rhs_tree(rhs)
+        else:
+            figs = []
+            for r in self.repo.rules:
+                figs.append(self.repo.visualize_rhs_tree(r))
+            return figs
+
+    def visualize_minimal_fd_candidates(self, rhs: Optional[str] = None):
+        """
+        构建 minimal FD 的前缀树（与普通 FD 分离）。
+        """
+        if not self.minimal_fds:
+            self.discover_minimal_fds()
+
+        self.repo = RuleRepository()
+        for lhs, r, conf in self.minimal_fds:
+            self.repo.add_rule(lhs, r, conf)
+
+        if rhs:
+            return self.repo.visualize_rhs_tree(rhs)
+
     def discover_minimal_fds(self, direct: bool = False) -> List[Tuple[Tuple[str], str, float]]:
         """
         返回最小化的 FD。默认使用已有候选 FD 进行剪枝。
@@ -277,12 +290,13 @@ class CFDDiscovererWithFD:
             "allow_overlap": allow_overlap
         }
     
-    def detect_cfd_violations(self, topk: int = 30) -> List[int]:
+    def detect_cfd_violations(self, topk: int = 30, min_support: int = 5, allow_overlap: bool = False, rhs_index: Optional[int] = None) -> List[int]:
         """
         检测前 topk 条 CFD 所违反的样本行索引（仅检测 variable CFD）
         """
         if not hasattr(self, "variable_cfds") or not self.variable_cfds:
-            self.discover_variable_cfds()
+            min_support = self._normalize_support(min_support)
+            self.discover_variable_cfds(min_support=min_support, allow_overlap=allow_overlap, rhs_index=rhs_index)
     
         violations = set()
     
@@ -315,13 +329,14 @@ class CFDDiscovererWithFD:
             return None
         return subset[rhs_attr].mode().iloc[0]
 
-    def repair_errors(self, topk: int = 30) -> pd.DataFrame:
+    def repair_errors(self, topk: int = 30, min_support: int = 5, allow_overlap: bool = False, rhs_index: Optional[int] = None) -> pd.DataFrame:
         """
         基于 Top-K variable CFD，对数据中违反规则的 RHS 值进行修复。
         返回修复后的 DataFrame。
         """
         if not hasattr(self, "variable_cfds") or not self.variable_cfds:
-            self.discover_variable_cfds()
+            min_support = self._normalize_support(min_support)
+            self.discover_variable_cfds(min_support=min_support, allow_overlap=allow_overlap, rhs_index=rhs_index)
     
         repaired_df = self.processed_df.copy()
         for (lhs_pattern, rhs_attr), conf, supp in self.variable_cfds[:topk]:
@@ -343,55 +358,66 @@ class CFDDiscovererWithFD:
 
     def get_top_fds(self, topk: int = 30):
         """
-        打印前 topk 条 FD 候选规则（非最小），包含置信度
+        Return the topk FD candidate rules (non-minimum), including the confidence level
+        The first line indicates the total number, and the rest are rule texts
         """
         if not self.fd_candidates:
             self.discover_fds()
-        print(f"Functional Dependencies (FDs) - Total: {len(self.fd_candidates)}")
-        for i, (lhs, rhs, conf) in enumerate(self.fd_candidates[:topk], 1):
-            lhs_str = " AND ".join(lhs)
-            print(f"{i}. IF {lhs_str} THEN {rhs} (conf = {conf:.4f})")
+
+        header = f"FDs - Total: {len(self.fd_candidates)}"
+        rules = [f"IF {' AND '.join(lhs)} THEN {rhs} (conf = {conf:.4f})"
+                 for lhs, rhs, conf in self.fd_candidates[:topk]]
+        return [header] + rules
 
     def get_top_minimal_fds(self, topk: int = 30, direct: bool = False):
         """
-        打印前 topk 条 Minimal FDs。
-        参数：
-            - topk: int，显示条数
-            - direct: bool，是否直接生成 minimal FDs（跳过 discover_fds）
+        Return the list of the topk Minimal FDs strings.
+        parameter:
+            - topk: Display the number of items
+            - direct: Whether to calculate minimal FDs directly (skip discover_fds)
+        return:
+            - list[str]，The first line is the total number, followed by the rule text
         """
         if not self.minimal_fds:
             self.discover_minimal_fds(direct=direct)
-    
-        print(f"Minimal Functional Dependencies - Total: {len(self.minimal_fds)}")
-        for i, (lhs, rhs, conf) in enumerate(self.minimal_fds[:topk], 1):
-            lhs_str = " AND ".join(lhs)
-            print(f"{i}. IF {lhs_str} THEN {rhs} (conf = {conf:.4f})")
-    
-    def get_top_cfds(self, topk: int = 30):
+
+        header = f"Minimal Functional Dependencies - Total: {len(self.minimal_fds)}"
+        rules = [f"IF {' AND '.join(lhs)} THEN {rhs} (conf = {conf:.4f})"
+                 for lhs, rhs, conf in self.minimal_fds[:topk]]
+        return [header] + rules
+
+    def get_top_cfds(self, topk: int = 30, min_support: int = 5, rhs_index: Optional[int] = None):
         """
-        打印前 topk 条 constant CFDs：IF A=val AND B=val THEN C=val
+        Return the string list of the topk constant CFDs.
+        Each form: IF A=val AND B=val THEN C=val (conf=..., supp=...)
         """
         if not hasattr(self, "cfd_rules") or not self.cfd_rules:
-            self.discover_cfds()
-        print(f"Constant CFDs - Total: {len(self.cfd_rules)}")
-        for i, ((lhs_pattern, rhs), conf, supp) in enumerate(self.cfd_rules[:topk], 1):
-            lhs_str = " AND ".join(f"{a}={v}" for a, v in lhs_pattern)
-            print(f"{i}. IF {lhs_str} THEN {rhs} (conf = {conf:.4f}, supp = {supp})")
+            min_support = self._normalize_support(min_support)
+            self.discover_cfds(min_support=min_support, rhs_index=rhs_index)
 
-    
-    def get_top_variable_cfds(self, topk: int = 30):
+        header = f"Constant CFDs - Total: {len(self.cfd_rules)}"
+        rules = [
+            f"IF {' AND '.join(f'{a}={v}' for a, v in lhs)} THEN {rhs} (conf = {conf:.4f}, supp = {supp})"
+            for (lhs, rhs), conf, supp in self.cfd_rules[:topk]
+        ]
+        return [header] + rules
+
+    def get_top_variable_cfds(self, topk: int = 30, min_support: int = 5, allow_overlap: bool = False,
+                              rhs_index: Optional[int] = None):
         """
-        打印前 topk 条 variable CFDs：IF A=val OR A=_ THEN ...
-        并添加标记：是否为 general retained 或 specific matched 规则
+        Return the string list of the topk variable CFDs.
+        Each form: IF A=val OR A=_ THEN C (conf, supp) [type]
         """
         if not hasattr(self, "variable_cfds") or not self.variable_cfds:
-            self.discover_variable_cfds()
-        print(f"Variable CFDs - Total: {len(self.variable_cfds)}")
-        for i, ((lhs_pattern, rhs), conf, supp) in enumerate(self.variable_cfds[:topk], 1):
+            min_support = self._normalize_support(min_support)
+            self.discover_variable_cfds(min_support=min_support, allow_overlap=allow_overlap, rhs_index=rhs_index)
+
+        header = f"Variable CFDs - Total: {len(self.variable_cfds)}"
+        rules = []
+        for (lhs_pattern, rhs), conf, supp in self.variable_cfds[:topk]:
             lhs_str = " AND ".join(f"{a}={v}" for a, v in lhs_pattern)
-            wildcard_count = sum(1 for a, v in lhs_pattern if v == "_")
-            if wildcard_count > 0:
-                tag = "[general-retained]"
-            else:
-                tag = "[specific-matched]"
-            print(f"{i}. IF {lhs_str} THEN {rhs} (conf = {conf:.4f}, supp = {supp}) {tag}")
+            wildcard_count = sum(1 for _, v in lhs_pattern if v == "_")
+            tag = "[general-retained]" if wildcard_count > 0 else "[specific-matched]"
+            rules.append(f"IF {lhs_str} THEN {rhs} (conf = {conf:.4f}, supp = {supp}) {tag}")
+
+        return [header] + rules

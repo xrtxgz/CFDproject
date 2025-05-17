@@ -84,37 +84,37 @@ class RuleRepository:
         return self.trees[rhs].delete(sorted_lhs)
 
     def visualize_rhs_tree(self, rhs: str):
-        """可视化某个 RHS 下的 LHS 前缀树结构（带属性名与终止标记）"""
+        """Visualize the LHS prefix tree structure under a certain RHS (with attribute names and termination tags), and return the matplotlib Figure"""
         if rhs not in self.trees:
             print(f"No rules for RHS: {rhs}")
-            return
-    
+            return None
+
         G = nx.DiGraph()
         node_id = [0]
         node_labels = {}
-    
+
         def add_nodes(node, parent_id=None, incoming_label="ROOT"):
             current_id = node_id[0]
             G.add_node(current_id)
             if parent_id is not None:
                 G.add_edge(parent_id, current_id)
-            # 设置显示内容：属性名 + 是否是终止点
             node_labels[current_id] = f"{incoming_label} {'(*)' if node.is_end else ''}"
-    
+
             for label, child in node.children.items():
                 node_id[0] += 1
                 add_nodes(child, current_id, label)
-    
+
         root = self.trees[rhs].root
         add_nodes(root)
-    
-        plt.figure(figsize=(10, 6))
-        pos = nx.spring_layout(G, seed=42)
-        nx.draw(G, pos, with_labels=False, node_size=600, arrows=True)
-        nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=9)
-        plt.title(f"Prefix Tree for RHS: {rhs}")
-        plt.axis('off')
-        plt.show()
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        pos = nx.spring_layout(G, seed=264)
+        nx.draw(G, pos, ax=ax, with_labels=False, node_size=600, arrows=True)
+        nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=9, ax=ax)
+        ax.set_title(f"Prefix Tree for RHS: {rhs}")
+        ax.axis('off')
+
+        return fig
 
 
 class TrashRepository:

@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from FDFirst import CFDDiscovererWithFD
 from datetime import datetime
+from fd_utils import render_fd_tree, render_minfd_tree, render_minfd_list_with_deletion
 
 
 st.set_page_config(page_title="CFD Discoverer", layout="wide")
@@ -137,49 +138,96 @@ if uploaded_file:
     # === Discovery & Display ===
     if "FD" in output_options:
         st.subheader("🔹 Functional Dependencies")
-        discoverer.get_top_fds(topk=topk)
+        fd_rules = discoverer.get_top_fds(topk=topk)
+        fds_df = pd.DataFrame({"FD Rule": fd_rules})
+        st.dataframe(fds_df)
+
+        if st.checkbox("Export FD Rules as CSV"):
+            csv_fd = fds_df.to_csv(index=False)
+            today = datetime.now().strftime("%Y%m%d")
+            st.download_button(
+                "Download FD Rules",
+                csv_fd,
+                file_name=f"fds_{today}.csv",
+                mime="text/csv"
+            )
 
     if "Minimal FD" in output_options:
-        st.subheader("🔹 Minimal FDs")
-        discoverer.get_top_minimal_fds(topk=topk, direct=direct_minfd)
+        st.subheader("🔹 Minimal Functional Dependencies")
+        minfd_rules = discoverer.get_top_minimal_fds(topk=topk, direct=direct_minfd)
+        minfd_df = pd.DataFrame({"minFD Rule": minfd_rules})
+        st.dataframe(minfd_df)
+
+        if st.checkbox("Export Minimal FD Rules as CSV"):
+            csv_minfd = minfd_df.to_csv(index=False)
+            today = datetime.now().strftime("%Y%m%d")
+            st.download_button(
+                "Download Minimal FD Rules",
+                csv_minfd,
+                file_name=f"minfds_{today}.csv",
+                mime="text/csv"
+            )
+
+        # ✅ 添加这行代码，调用删除界面（基于当前列表）
+        render_minfd_list_with_deletion(discoverer, df)
 
     if "CFD" in output_options:
         st.subheader("🔹 Constant CFDs")
-        discoverer.discover_cfds(min_support=min_supp)
-        discoverer.get_top_cfds(topk=topk)
-        today = datetime.now().strftime("%Y%m%d")
-        if st.download_button("Download CFD Rules as CSV",pd.DataFrame(discoverer.cfd_rules),
-                              file_name=f"cfd_rules_{today}.csv"):
-            st.success("CFD rules exported.")
+        cfd_rules = discoverer.get_top_cfds(topk=topk, min_support=min_supp, rhs_index=rhs_index)
+        st.info(cfd_rules[0])
+        cfd_df = pd.DataFrame({"CFD Rule": cfd_rules[1:]})
+        st.dataframe(cfd_df)
+
+        if st.checkbox("Export CFD Rules as CSV"):
+            csv_cfd = cfd_df.to_csv(index=False)
+            today = datetime.now().strftime("%Y%m%d")
+            st.download_button(
+                "Download CFD Rules",
+                csv_cfd,
+                file_name=f"cfd_rules_{today}.csv",
+                mime="text/csv"
+            )
 
     if "vCFD" in output_options:
         st.subheader("🔹 Variable CFDs")
-        discoverer.discover_variable_cfds(min_support=min_supp, allow_overlap=allow_overlap)
-        discoverer.get_top_variable_cfds(topk=topk)
-        today = datetime.now().strftime("%Y%m%d")
-        if st.download_button("Download vCFD Rules as CSV", pd.DataFrame(discoverer.variable_cfds),
-                              file_name=f"vcfd_rules_{today}.csv"):
-            st.success("vCFD rules exported.")
+        vcfd_rules = discoverer.get_top_variable_cfds(
+            topk=topk,
+            min_support=min_supp,
+            allow_overlap=allow_overlap,
+            rhs_index=rhs_index
+        )
+
+        st.info(vcfd_rules[0])
+        vcfd_df = pd.DataFrame({"Variable CFD Rule": vcfd_rules[1:]})
+        st.dataframe(vcfd_df)
+
+        if st.checkbox("Export vCFD Rules as CSV"):
+            csv_vcfd = vcfd_df.to_csv(index=False)
+            st.download_button(
+                "Download vCFD Rules",
+                csv_vcfd,
+                file_name=f"vcfd_rules_{today}.csv",
+                mime="text/csv"
+            )
 
     if "CFD Log" in output_options:
         st.subheader("CFD Log")
-        cfd_info, cfd_log = discoverer.discover_cfds_tracked(min_support=min_supp)
+        cfd_info, cfd_log = discoverer.discover_cfds_tracked(min_support=min_supp, rhs_index=rhs_index)
         st.json({**cfd_info, **cfd_log})
 
     if "vCFD Log" in output_options:
         st.subheader("Variable CFD Log")
         vcfds_info, vcfds_log = discoverer.discover_variable_cfds_tracked(min_support=min_supp,
-                                                                          allow_overlap=allow_overlap)
+                                                                          allow_overlap=allow_overlap, rhs_index=rhs_index)
         st.json({**vcfds_info, **vcfds_log})
 
     # === FD Tree Visualization ===
     if rhs_vis:
         if fd_vis:
-            st.subheader(f"FD Tree: RHS = {rhs_vis}")
-            discoverer.repo.visualize_rhs_tree(rhs_vis)
+            render_fd_tree(discoverer, rhs_vis, topk=topk)
+
         if minfd_vis:
-            st.subheader(f"Minimal FD Tree: RHS = {rhs_vis}")
-            discoverer.repo.visualize_rhs_tree(rhs_vis)
+            render_minfd_tree(discoverer, rhs_vis, topk=topk, direct_minfd=direct_minfd)
 
     # === Error detection & repair ===
     st.header("Post-CFD Options")
