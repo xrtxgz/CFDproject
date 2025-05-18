@@ -1,8 +1,6 @@
 import pandas as pd
 import numpy as np
 import time
-import psutil
-import os
 import tracemalloc
 from typing import List, Tuple, Optional, Dict
 from collections import defaultdict, Counter
@@ -14,7 +12,7 @@ from confidence import ConfidenceCalculator
 
 def with_time_and_memory_tracking(func):
     """
-    装饰器：测量函数运行时间 + 内存使用峰值（准确、不受垃圾回收影响）
+    Decorator: Measures function running time + peak memory usage (accurate and not affected by garbage collection)
     """
     def wrapper(*args, **kwargs):
         tracemalloc.start()
@@ -80,7 +78,7 @@ class CFDDiscovererWithFD:
         return int(min_support)
 
     def build_lhs_partitions(self):
-        """构造所有可能 LHS 的等价类划分：lhs -> {key_tuple: [row_indices]}"""
+        """Construct the equivalence class partitioning of all possible LHS: lhs -> {key_tuple: [row_indices]}"""
         self.lhs_partitions = {}
         for size in range(1, self.maxsize + 1):
             for lhs in combinations(self.attributes, size):
@@ -133,7 +131,7 @@ class CFDDiscovererWithFD:
 
     def visualize_minimal_fd_candidates(self, rhs: Optional[str] = None):
         """
-        构建 minimal FD 的前缀树（与普通 FD 分离）。
+        Build the prefix tree of minimal FD.
         """
         if not self.minimal_fds:
             self.discover_minimal_fds()
@@ -147,8 +145,8 @@ class CFDDiscovererWithFD:
 
     def discover_minimal_fds(self, direct: bool = False) -> List[Tuple[Tuple[str], str, float]]:
         """
-        返回最小化的 FD。默认使用已有候选 FD 进行剪枝。
-        设置 direct=True 时，直接边枚举边剪枝，无需先生成所有 FD。
+        Return the minimized FD. Pruning is performed by default using the existing candidate FDS.
+        When setting direct=True, directly enumerate and prune simultaneously without first generating all FDS.
         """
         self.minimal_fds = []
         self.repo = RuleRepository()
@@ -289,17 +287,18 @@ class CFDDiscovererWithFD:
             "min_confidence": self.minconf,
             "allow_overlap": allow_overlap
         }
-    
-    def detect_cfd_violations(self, topk: int = 30, min_support: int = 5, allow_overlap: bool = False, rhs_index: Optional[int] = None) -> List[int]:
+
+    def detect_cfd_violations(self, topk: int = 30, min_support: int = 5, allow_overlap: bool = False,
+                              rhs_index: Optional[int] = None) -> List[int]:
         """
-        检测前 topk 条 CFD 所违反的样本行索引（仅检测 variable CFD）
+        Detect the index of the sample rows violated by the topk CFDS before (only detect variable CFDS)
         """
         if not hasattr(self, "variable_cfds") or not self.variable_cfds:
             min_support = self._normalize_support(min_support)
             self.discover_variable_cfds(min_support=min_support, allow_overlap=allow_overlap, rhs_index=rhs_index)
-    
+
         violations = set()
-    
+
         for (lhs_pattern, rhs_attr), conf, supp in self.variable_cfds[:topk]:
             for idx, row in enumerate(self.db):
                 match = True
@@ -312,12 +311,12 @@ class CFDDiscovererWithFD:
                 if match:
                     if row[rhs_attr] != self._get_expected_rhs_value(lhs_pattern, rhs_attr):
                         violations.add(idx)
-    
+
         return sorted(violations)
-    
+
     def _get_expected_rhs_value(self, lhs_pattern: Tuple[Tuple[str, str]], rhs_attr: str) -> str:
         """
-        在 processed_df 中查找与 lhs_pattern 匹配样本中最常见的 RHS 值
+        Look for the most common RHS values in the samples that match the lhs_pattern in processed_df
         """
         cond = np.ones(len(self.processed_df), dtype=bool)
         for attr, val in lhs_pattern:
@@ -329,21 +328,24 @@ class CFDDiscovererWithFD:
             return None
         return subset[rhs_attr].mode().iloc[0]
 
-    def repair_errors(self, topk: int = 30, min_support: int = 5, allow_overlap: bool = False, rhs_index: Optional[int] = None) -> pd.DataFrame:
+    def repair_errors(self, topk: int = 30, min_support: int = 5, allow_overlap: bool = False,
+                      rhs_index: Optional[int] = None) -> pd.DataFrame:
         """
-        基于 Top-K variable CFD，对数据中违反规则的 RHS 值进行修复。
-        返回修复后的 DataFrame。
+        Based on Top-K variable CFD, the RHS values that violate the rules in the data are repaired.
+        Return the repaired DataFrame.
         """
         if not hasattr(self, "variable_cfds") or not self.variable_cfds:
             min_support = self._normalize_support(min_support)
             self.discover_variable_cfds(min_support=min_support, allow_overlap=allow_overlap, rhs_index=rhs_index)
-    
+
         repaired_df = self.processed_df.copy()
         for (lhs_pattern, rhs_attr), conf, supp in self.variable_cfds[:topk]:
+            if conf < self.minconf:
+                continue
             expected_rhs_val = self._get_expected_rhs_value(lhs_pattern, rhs_attr)
             if expected_rhs_val is None:
                 continue
-    
+
             for idx, row in self.processed_df.iterrows():
                 match = True
                 for attr, val in lhs_pattern:
@@ -372,26 +374,24 @@ class CFDDiscovererWithFD:
     def get_top_minimal_fds(self, topk: int = 30, direct: bool = False):
         """
         Return the list of the topk Minimal FDs strings.
-        parameter:
-            - topk: Display the number of items
-            - direct: Whether to calculate minimal FDs directly (skip discover_fds)
-        return:
-            - list[str]，The first line is the total number, followed by the rule text
+        Parameters:
+            - topk: Number of top items to return
+            - direct: If True, force discovery of new minimal FDs (overwrites current ones)
+        Returns:
+            - list[str]
         """
-        if not self.minimal_fds:
-            self.discover_minimal_fds(direct=direct)
-
+        if direct:
+            self.discover_minimal_fds(direct=True)
         header = f"Minimal Functional Dependencies - Total: {len(self.minimal_fds)}"
-        rules = [f"IF {' AND '.join(lhs)} THEN {rhs} (conf = {conf:.4f})"
-                 for lhs, rhs, conf in self.minimal_fds[:topk]]
+        rules = [
+            f"IF {' AND '.join(lhs)} THEN {rhs} (conf = {conf:.4f})"
+            for lhs, rhs, conf in self.minimal_fds[:topk]
+        ]
         return [header] + rules
 
-    def get_top_cfds(self, topk: int = 30, min_support: int = 5, rhs_index: Optional[int] = None):
-        """
-        Return the string list of the topk constant CFDs.
-        Each form: IF A=val AND B=val THEN C=val (conf=..., supp=...)
-        """
-        if not hasattr(self, "cfd_rules") or not self.cfd_rules:
+    def get_top_cfds(self, topk: int = 30, min_support: int = 5, rhs_index: Optional[int] = None, force: bool = False):
+        if force or not hasattr(self, "cfd_rules") or not self.cfd_rules:
+            self.cfd_rules = []
             min_support = self._normalize_support(min_support)
             self.discover_cfds(min_support=min_support, rhs_index=rhs_index)
 
@@ -403,12 +403,9 @@ class CFDDiscovererWithFD:
         return [header] + rules
 
     def get_top_variable_cfds(self, topk: int = 30, min_support: int = 5, allow_overlap: bool = False,
-                              rhs_index: Optional[int] = None):
-        """
-        Return the string list of the topk variable CFDs.
-        Each form: IF A=val OR A=_ THEN C (conf, supp) [type]
-        """
-        if not hasattr(self, "variable_cfds") or not self.variable_cfds:
+                              rhs_index: Optional[int] = None, force: bool = False):
+        if force or not hasattr(self, "variable_cfds") or not self.variable_cfds:
+            self.variable_cfds = []
             min_support = self._normalize_support(min_support)
             self.discover_variable_cfds(min_support=min_support, allow_overlap=allow_overlap, rhs_index=rhs_index)
 
@@ -421,3 +418,5 @@ class CFDDiscovererWithFD:
             rules.append(f"IF {lhs_str} THEN {rhs} (conf = {conf:.4f}, supp = {supp}) {tag}")
 
         return [header] + rules
+
+

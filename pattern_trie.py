@@ -23,8 +23,8 @@ class PatternTrie:
 
     def has_more_general_pattern(self, pattern: Tuple[Tuple[str, str]]) -> bool:
         """
-        判断是否存在一个比当前模式更泛化（更多 _）的规则已经存在
-        如：已有 (A=_, B=1) 时，不再插入 (A=val, B=1)
+        Determine whether a rule that is more generalized (with more _) than the current pattern already exists
+        For example, when there is already (A=_, B=1), do not insert (A=val, B=1).
         """
         def dfs(node, idx):
             if node.is_end:
@@ -34,7 +34,7 @@ class PatternTrie:
             attr, val = pattern[idx]
             candidates = []
 
-            # 通用匹配：当前路径可走 _ 或具体值
+            # General matching: The current path can be followed by _ or a specific value
             key_exact = self._key(attr, val)
             key_wild = self._key(attr, '_')
             if key_exact in node.children:

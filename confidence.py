@@ -4,12 +4,11 @@ from collections import defaultdict, Counter
 
 class ConfidenceCalculator:
     """
-    三种置信度计算方式的统一模块：
-    - overall: 全局置信度（当前默认）
-    - min: 每组最小置信度
-    - avg: 每组平均置信度
+    A unified module for the three confidence calculation methods:
+    overall: Global confidence level (current default)
+    min: Minimum confidence level for each group
+    avg: Average confidence level per group
     """
-
     def __init__(self, db: List[dict]):
         self.db = db
 

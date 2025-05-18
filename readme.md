@@ -1,60 +1,112 @@
-# Discovering Conditional Functional Dependencies
+# CFD: FD-First Algorithm Tool (Graduation Project)
 
-> Based on the conference paper "Revisiting Conditional Functional Dependency Discovery: Splitting the “C” from the “FD”.", by J. Rammelaere and F. Geerts, to be published in the Joint European Conference on Machine Learning and Knowledge Discovery in Databases (ECML PKDD 2018). Code by Joeri Rammelaere.
+This is an interactive tool based on Streamlit, designed to discover, visualize, and repair various dependency rules from relational datasets:
 
-## Quick Start Guide
-The code compiles with cmake. 
-The algorithm takes four mandatory arguments and one optional as input:
-1. A dataset in csv format
-2. The minimum support threshold
-3. The confidence leeway threshold
-4. The maximum antecedent size of the discovered CFDs
-5. [Optional] The algorithm/implementation to be used (See "Algorithmic Choices")
+- Functional Dependencies (FD)
+- Minimal Functional Dependencies (Minimal FD)
+- Constant Conditional Functional Dependencies (CFD)
+- Variable Conditional Functional Dependencies (Variable CFD / vCFD)
 
-## Available Datasets
-The Data/ folder contains the 3 datasets used in the experimental section, as well as the Contraceptive dataset, taken from the UCI Machine Learning Repository (http://archive.ics.uci.edu/ml/). 
+## Features
 
-Statistics of the datasets:
+- Upload your own CSV dataset, or select sample datasets from the `DataSet` folder
+- Supports discovery of:
+  - All FD rules
+  - Minimal FDs (with support for deletion, updating, and direct minimal FD mining)
+  - Constant CFDs (with support and confidence thresholds)
+  - Variable CFDs (with pattern generalization and overlap control)
+- Visualize FD and Minimal FD as tree structures (grouped by RHS)
+- Configure key parameters: support, confidence, max LHS size, target RHS, Top-K output, and discretization bins
+- View discovery logs for CFD processes
+- Perform error detection and automatic repair
+- Export discovered rules and repaired data as CSV files
 
-Dataset | Nr. Tuples | Nr. Items | Nr. Attributes
-:--- | :--- | :--- | :---
-Adult | 48842 | 202 | 11
-Mushroom | 8124 | 119 | 15
-Nursery | 12960 | 32 | 9
+## Quick Start
 
-## Problem Statement
-Given an instance D of a schema R, support threshold delta, confidence leeway threshold epsilon, and maximum antecedent size alpha, the approximate CFD discovery problem is to find all CFDs phi: (X -> Y, tp) over R with:
-* support(phi,D) >= delta
-* confidence(phi,D) >= 1-epsilon
-* |X| <= alpha.
+### 1. Install dependencies
 
-## Algorithmic Choices
-As described in the paper, the code supports 10 distinct algorithms, belonging to three different general methodologies: integrated, itemset-first, and fd-first. The integrated method can be run depth-first or breadth-first (corresponding to normal CTane). The itemset-first and fd-first methods consist of 2 steps, each of which can also be run either depth-first or breadth-first. 
-This gives the following options:
-* Integrated-BFS (CTane)
-* Integrated-DFS
-* Itemset-First-BFS-bfs
-* Itemset-First-BFS-dfs
-* Itemset-First-DFS-bfs
-* Itemset-First-DFS-dfs
-* FD-First-BFS-bfs
-* FD-First-BFS-dfs
-* FD-First-DFS-bfs
-* FD-First-DFS-dfs
+```bash
+pip install -r requirements.txt
+```
 
-By default, the option FD-First-DFS-dfs is chosen, as it is typically the fastest.
+### 2. Launch the Streamlit app
 
-## Paper Abstract
-Many techniques for cleaning dirty data are based on enforcing
-some set of integrity constraints. Conditional functional dependencies
-(CFDs) are a combination of traditional Functional dependencies (FDs)
-and association rules, and are widely used as a constraint formalism for
-data cleaning. However, the discovery of such CFDs has received limited
-attention. In this paper, we regard CFDs as an extension of association
-rules, and present three general methodologies for (approximate) CFD
-discovery, each using a different way of combining pattern mining for discovering
-the conditions (the “C” in CFD) with FD discovery. We discuss
-how existing algorithms fit into these three methodologies, and introduce
-new techniques to improve the discovery process. We show that the right
-choice of methodology improves performance over the traditional CFD
-discovery method CTane.
+```bash
+streamlit run main.py
+```
+
+### 3. Upload dataset or use built-in samples
+
+- Format: CSV file
+- Optional settings:
+  - Manually specify column names
+  - Exclude columns by their index
+
+You can also select built-in datasets located in the `DataSet/` directory.
+
+---
+
+## Parameter Description
+
+| Parameter           | Description                                                                 |
+|---------------------|-----------------------------------------------------------------------------|
+| Minimum Support     | Accepts a float (e.g., 0.05 for 5%) or an integer (e.g., 10 means ≥10 records) |
+| Minimum Confidence  | Range: 0.5 to 1.0. Higher means stricter rule reliability                   |
+| Max LHS Size        | Maximum number of attributes on the left-hand side of the rule              |
+| RHS Column Index    | Optionally fix the right-hand side to a specific column index               |
+| Top-K Rules         | Display the top K rules ranked by support or confidence                     |
+| Discretization Bins | Optional bin count for numerical columns (e.g., 4 splits values into 4 ranges) |
+
+---
+
+## Project Structure
+
+.
+├── main.py # Streamlit frontend and UI logic
+├── FDFirst.py # Core discovery of FD, Minimal FD, CFD, and vCFD
+├── fd_utils.py # Visualization and interactive logic for FD tree & lists
+├── pattern_trie.py # Prefix tree structure for vCFD overlap control
+├── rule_repository.py # Rule storage, management, and repair functionality
+├── confidence.py # Confidence calculation for CFDs
+├── DataSet/ # Sample datasets for testing
+
+---
+
+## Output Files
+
+After running the tool, the following outputs may be generated:
+
+- **Tree visualizations** for FD and Minimal FD (grouped by RHS)
+- **Tabular rule displays** for:
+  - Functional Dependencies
+  - Minimal Functional Dependencies
+  - Constant CFDs
+  - Variable CFDs
+- **Exportable CSVs**:
+  - `fd_rules.csv` – Full FD list
+  - `minimal_fd_rules.csv` – Filtered minimal FD list
+  - `cfds.csv` – Constant CFDs (meet support/confidence thresholds)
+  - `vcfds.csv` – Variable CFDs (may include overlapping/generalized patterns)
+  - `repaired_data.csv` – Dataset after vCFD-based repairs
+  - `discovery_log.csv` – Time/memory/rule statistics from CFD discovery
+
+---
+
+## Environment Requirements
+
+Install required packages:
+
+```bash
+pip install -r requirements.txt
+```
+
+requirements.txt includes:
+
+```shell
+streamlit>=1.20.0
+pandas>=1.4.0
+numpy>=1.22.0
+matplotlib>=3.5.0
+scikit-learn>=1.1.0
+networkx>=2.6
+```

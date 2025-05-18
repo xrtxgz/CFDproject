@@ -76,7 +76,7 @@ class RuleRepository:
         return False
 
     def delete(self, lhs: Tuple[str, ...], rhs: str) -> bool:
-        """从规则集合与 prefix tree 中移除该条规则"""
+        """Remove this rule from the rule set and the prefix tree"""
         sorted_lhs = tuple(sorted(lhs))
         if rhs not in self.rules:
             return False
