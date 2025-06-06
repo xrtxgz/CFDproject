@@ -15,6 +15,11 @@ uploaded_file = st.sidebar.file_uploader("Upload your CSV dataset", type=["csv"]
 
 custom_header = st.sidebar.checkbox("Manually enter column names", False)
 
+sample_percent = st.sidebar.number_input(
+    "Sampling percentage (0-100%)", min_value=1, max_value=100, value=100, step=1,
+    help="Randomly sample a percentage of rows from the dataset"
+)
+
 # --- Column Exclude ---
 exclude_cols_str = st.sidebar.text_input(
     "Column indices to exclude (comma-separated)",
@@ -162,6 +167,11 @@ if use_builtin:
     df_path = os.path.join(builtin_dir, builtin_choice)
     df = pd.read_csv(df_path)
     st.success(f"Loaded built-in dataset: {builtin_choice}")
+
+    if sample_percent < 100:
+        df = df.sample(frac=sample_percent / 100.0, random_state=264).reset_index(drop=True)
+        st.sidebar.success(f"Sampled {len(df)} rows ({sample_percent}%)")
+
 elif uploaded_file:
     if custom_header:
         temp = pd.read_csv(uploaded_file, header=None)
@@ -172,6 +182,10 @@ elif uploaded_file:
         df = pd.read_csv(uploaded_file, header=None, names=col_names)
     else:
         df = pd.read_csv(uploaded_file)
+
+    if sample_percent < 100:
+        df = df.sample(frac=sample_percent / 100.0, random_state=264).reset_index(drop=True)
+        st.sidebar.success(f"Sampled {len(df)} rows ({sample_percent}%)")
 
 if 'df' in locals() and excluded_indices:
     if max(excluded_indices) < df.shape[1]:
