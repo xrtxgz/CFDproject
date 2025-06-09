@@ -382,6 +382,11 @@ class CFDDiscovererWithFD:
         """
         if direct:
             self.discover_minimal_fds(direct=True)
+        else:
+            if not self.fd_candidates:
+                self.discover_fds()
+            self.discover_minimal_fds(direct=False)
+
         header = f"Minimal Functional Dependencies - Total: {len(self.minimal_fds)}"
         rules = [
             f"IF {' AND '.join(lhs)} THEN {rhs} (conf = {conf:.4f})"

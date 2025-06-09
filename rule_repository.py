@@ -90,30 +90,35 @@ class RuleRepository:
             return None
 
         G = nx.DiGraph()
-        node_id = [0]
         node_labels = {}
+        node_id = [0]
 
-        def add_nodes(node, parent_id=None, incoming_label="ROOT"):
-            current_id = node_id[0]
-            G.add_node(current_id)
+        # 用于存储节点 ID 映射关系，便于可控布局
+        node_pos = {}
+
+        def add_nodes(node, depth=0, pos_x=0, parent_id=None, label="ROOT"):
+            this_id = node_id[0]
+            node_id[0] += 1
+
+            G.add_node(this_id)
+            node_labels[this_id] = f"{label}" + (" (*)" if node.is_end else "")
+            node_pos[this_id] = (pos_x, -depth)
+
             if parent_id is not None:
-                G.add_edge(parent_id, current_id)
-            node_labels[current_id] = f"{incoming_label} {'(*)' if node.is_end else ''}"
+                G.add_edge(parent_id, this_id)
 
-            for label, child in node.children.items():
-                node_id[0] += 1
-                add_nodes(child, current_id, label)
+            # 每层横向偏移量
+            child_offset = -len(node.children) / 2
+            for i, (child_label, child_node) in enumerate(sorted(node.children.items())):
+                add_nodes(child_node, depth + 1, pos_x + i + child_offset, this_id, child_label)
 
-        root = self.trees[rhs].root
-        add_nodes(root)
+        add_nodes(self.trees[rhs].root)
 
-        fig, ax = plt.subplots(figsize=(10, 6))
-        pos = nx.spring_layout(G, seed=264)
-        nx.draw(G, pos, ax=ax, with_labels=False, node_size=600, arrows=True)
-        nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=9, ax=ax)
+        fig, ax = plt.subplots(figsize=(12, 6))
+        nx.draw(G, pos=node_pos, ax=ax, with_labels=False, node_size=600, arrows=True)
+        nx.draw_networkx_labels(G, pos=node_pos, labels=node_labels, font_size=9, ax=ax)
         ax.set_title(f"Prefix Tree for RHS: {rhs}")
-        ax.axis('off')
-
+        ax.axis("off")
         return fig
 
 

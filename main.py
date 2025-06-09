@@ -245,6 +245,7 @@ if df is not None:
             st.session_state.refresh_flags["Minimal FD"] = False
 
         if not st.session_state.minfd_df.empty:
+            st.info(f"Total Minimal FDs: {len(discoverer.minimal_fds)}")
             st.dataframe(st.session_state.minfd_df)
         else:
             st.info("No Minimal FDs available.")
