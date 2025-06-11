@@ -73,7 +73,7 @@ class CFDDiscovererWithFD:
         return df
 
     def _normalize_support(self, min_support):
-        if min_support < 1:  # 比如 0.05，表示百分比
+        if min_support < 1:
             return int(np.ceil(min_support * len(self.processed_df)))
         return int(min_support)
 

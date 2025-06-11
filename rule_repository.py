@@ -92,8 +92,6 @@ class RuleRepository:
         G = nx.DiGraph()
         node_labels = {}
         node_id = [0]
-
-        # 用于存储节点 ID 映射关系，便于可控布局
         node_pos = {}
 
         def add_nodes(node, depth=0, pos_x=0, parent_id=None, label="ROOT"):
@@ -107,7 +105,6 @@ class RuleRepository:
             if parent_id is not None:
                 G.add_edge(parent_id, this_id)
 
-            # 每层横向偏移量
             child_offset = -len(node.children) / 2
             for i, (child_label, child_node) in enumerate(sorted(node.children.items())):
                 add_nodes(child_node, depth + 1, pos_x + i + child_offset, this_id, child_label)

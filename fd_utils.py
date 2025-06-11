@@ -64,7 +64,6 @@ def render_minfd_list_with_deletion(discoverer, df):
         ]) if discoverer.minimal_fds else pd.DataFrame()
         st.session_state.refresh_flags["Minimal FD"] = True
 
-        # ✅ 添加以下内容
         st.session_state.refresh_flags["CFD"] = True
         st.session_state.refresh_flags["vCFD"] = True
         st.session_state.refresh_flags["CFD Log"] = True
