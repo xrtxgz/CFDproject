@@ -67,9 +67,12 @@ def render_minfd_list_with_deletion(discoverer, df):
         # ✅ 添加以下内容
         st.session_state.refresh_flags["CFD"] = True
         st.session_state.refresh_flags["vCFD"] = True
+        st.session_state.refresh_flags["CFD Log"] = True
+        st.session_state.refresh_flags["vCFD Log"] = True
         st.session_state.force_cfd_refresh = True
         st.session_state.pop("cfd_rules", None)
         st.session_state.pop("vcfd_rules", None)
+
 
     #Method One: Delete by column names
     with st.form("delete_minfd_lhs_rhs"):
